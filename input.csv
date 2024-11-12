@@ -1,0 +1,8 @@
+Component,Value
+states,q0,q1,q2
+input_alphabet,a,b
+stack_alphabet,Z,X,Y
+transitions,q0,a,epsilon,q1,X
+transitions,q1,b,X,q2,X
+initial_state,q0
+final_states,q2
