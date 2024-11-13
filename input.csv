@@ -4,5 +4,6 @@ input_alphabet,a,b
 stack_alphabet,Z,X,Y
 transitions,q0,a,epsilon,q1,X
 transitions,q1,b,X,q2,X
+transitions,q2,b,X,q1,epsilon
 initial_state,q0
-final_states,q2
+final_states,q1,q2

@@ -185,6 +185,20 @@ def update_pda(pda_json):
     else:
         print("There are multiple final states. Updates will be made later.")
 
+        # Step 1.1: Choose the last final state as the main accept state
+        main_accept_state = pda_json["final_states"][-1]
+        print(f"Main accept state is set to '{main_accept_state}'.")
+
+        # Step 1.2: Create transitions from each other accept state to the main accept state
+        for accept_state in pda_json["final_states"][:-1]:  # Exclude the last state
+            # Create the transition
+            if accept_state not in pda_json["transitions"]:
+                pda_json["transitions"][accept_state] = {}
+            if "epsilon" not in pda_json["transitions"][accept_state]:
+                pda_json["transitions"][accept_state]["epsilon"] = {}
+            pda_json["transitions"][accept_state]["epsilon"]["epsilon"] = (main_accept_state, "epsilon")
+
+
     # Step 2: Check if the final transition empties the stack
     stack_operations = {}
     
@@ -207,17 +221,58 @@ def update_pda(pda_json):
     # Check if any pushed symbol was not popped
     for stack_symbol, operations in stack_operations.items():
         if operations['pushed'] > operations['popped']:
-            print(f"Stack symbol '{stack_symbol}' was pushed but never fully popped. The stack needs to be emptied.")
+            error_message = f"Stack symbol '{stack_symbol}' was pushed but never fully popped. The stack needs to be emptied."
+            print(error_message)
+            raise ValueError(f"Stack not emptied: {error_message}. Please update the PDA input.")
+
+        
+   # Step 3: Check for transitions where the stack stays the same
+    fix_counter = 1  # Initialize fix counter
+    transitions_to_delete = []  # List to store transitions to delete
+
+    # Append new input alphabet character '@' to input_symbols if not already present
+    new_input_alpha = '@'
+    pda_json["input_symbols"].append(new_input_alpha)
     
-    # Step 3: Check for transitions where the stack stays the same
-    for current_state, input_symbol_dict in pda_json["transitions"].items():
-        for input_symbol, popped_symbol_dict in input_symbol_dict.items():
-            for popped_symbol, (next_state, pushed_symbol) in popped_symbol_dict.items():
+    # Create a list of current transitions to iterate over
+    current_transitions = list(pda_json["transitions"].items())
+
+    for current_state, input_symbol_dict in current_transitions:
+        for input_symbol, popped_symbol_dict in list(input_symbol_dict.items()):
+            for popped_symbol, (next_state, pushed_symbol) in list(popped_symbol_dict.items()):
                 # Check if both the push and pop operations are the same
                 if popped_symbol == pushed_symbol:
-                    print(f"There is a problem with the transition at {current_state} with input symbol '{input_symbol}'. "
-                          f"The stack symbol '{popped_symbol}' is both pushed and popped, so the stack stays the same.")
-    
+                    # Create a new fix state name
+                    fix_state_name = f"qfix{fix_counter}"
+                    fix_counter += 1
+
+                    # Create the new transition from the original start state to the fix state
+                    original_alphabet = input_symbol  # Store the original input symbol
+                    
+                    # Add new transitions to the PDA
+                    if fix_state_name not in pda_json["transitions"]:
+                        pda_json["transitions"][fix_state_name] = {}
+                    
+                    if original_alphabet not in pda_json["transitions"][current_state]:
+                        pda_json["transitions"][current_state][original_alphabet] = {}
+                    pda_json["transitions"][current_state][original_alphabet]["ϵ"] = (fix_state_name, new_input_alpha)
+                    
+                    if "ϵ" not in pda_json["transitions"][fix_state_name]:
+                        pda_json["transitions"][fix_state_name]["ϵ"] = {}
+                    pda_json["transitions"][fix_state_name]["ϵ"][new_input_alpha] = (next_state, "ϵ")
+
+                    # Mark the original transition for deletion
+                    transitions_to_delete.append((current_state, input_symbol))
+
+    # Delete the original transitions that caused issues
+    for current_state, input_symbol in transitions_to_delete:
+        del pda_json["transitions"][current_state][input_symbol]
+
+
+    # Print the updated PDA JSON for verification
+    print("Updated PDA JSON:")
+    print(json.dumps(pda_json, indent=4))  # Pretty-print the JSON with indentation
+
     return pda_json
 
 def convert_pda_to_cfg(pda_json):
