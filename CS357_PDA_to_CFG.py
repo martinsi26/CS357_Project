@@ -96,11 +96,6 @@ def check_pda(pda_json):
     if overlapping:
         raise ValueError(f"States cannot overlap with input symbols or stack symbols: {', '.join(overlapping)}")
     
-    # Ensure input symbols and stack symbols do not overlap
-    overlapping_symbols = input_symbols & stack_symbols
-    if overlapping_symbols:
-        raise ValueError(f"Input symbols and stack symbols cannot overlap: {', '.join(overlapping_symbols)}")
-    
     # Ensure initial state is a valid state
     if pda_json["initial_state"] not in states:
         raise ValueError(f"Initial state '{pda_json['initial_state']}' is not a valid state.")
@@ -150,6 +145,56 @@ def check_pda(pda_json):
     
     return pda_json
 
+def check_pda_conversion(pda_json):
+    # Step 1: Check if there is only one final state
+    if len(pda_json["final_states"]) > 1:
+        error_message = "There are multiple final states"
+        print(error_message)
+        raise ValueError(f"PDA incorrect: {error_message}. Please update the PDA input.")
+
+
+    # Step 2: Check if the final transition empties the stack
+    stack_operations = {}
+    
+    # Track all stack operations (pushes and pops)
+    for current_state, input_symbol_dict in pda_json["transitions"].items():
+        for input_symbol, popped_symbol_dict in input_symbol_dict.items():
+            for popped_symbol, (next_state, pushed_symbol) in popped_symbol_dict.items():
+                # Track push operations
+                if pushed_symbol != 'epsilon':  # If it's not epsilon, it's a push
+                    if pushed_symbol not in stack_operations:
+                        stack_operations[pushed_symbol] = {'pushed': 0, 'popped': 0}
+                    stack_operations[pushed_symbol]['pushed'] += 1
+                
+                # Track pop operations
+                if popped_symbol != 'epsilon':  # If it's not epsilon, it's a pop
+                    if popped_symbol not in stack_operations:
+                        stack_operations[popped_symbol] = {'pushed': 0, 'popped': 0}
+                    stack_operations[popped_symbol]['popped'] += 1
+
+    # Check if any pushed symbol was not popped
+    for stack_symbol, operations in stack_operations.items():
+        if operations['pushed'] > operations['popped']:
+            error_message = f"Stack symbol '{stack_symbol}' was pushed but never fully popped. The stack needs to be emptied."
+            print(error_message)
+            raise ValueError(f"Stack not emptied: {error_message}. Please update the PDA input.")
+        
+    # Step 3: Check for transitions where the stack stays the same
+    for current_state, input_symbol_dict in pda_json["transitions"].items():
+        for input_symbol, popped_symbol_dict in input_symbol_dict.items():
+            for popped_symbol, (next_state, pushed_symbol) in popped_symbol_dict.items():
+                # Check if both the push and pop operations are the same
+                if popped_symbol == pushed_symbol:
+                    error_message = f"Popped symbol '{popped_symbol}' is the same as the pushed symbol '{pushed_symbol}' in transition from state '{current_state}' with input '{input_symbol}'"
+                    print(error_message)
+                    raise ValueError(f"PDA transitions incorrect: {error_message}. Please update the PDA input.")
+
+
+    # Print the updated PDA JSON for verification
+    print("PDA is valid for conversion.")
+
+    return pda_json
+
 def create_cfg_json(variables, alphabet, rules, start_variable):
     cfg = {
         "variables": variables,
@@ -158,6 +203,57 @@ def create_cfg_json(variables, alphabet, rules, start_variable):
         "start_variable": start_variable
     }
     return cfg
+
+def find_push_to_pop(pda_json):
+    pushed_popped_pairs = []
+
+    # Iterate through each state and its transitions to identify push operations
+    for start_state, input_transitions in pda_json["transitions"].items():
+        for input_symbol, stack_operations in input_transitions.items():
+            for pop_symbol, (end_state, push_symbol) in stack_operations.items():
+                
+                # Check if it is a push operation (not epsilon)
+                if push_symbol != "epsilon":
+                    # For each pushed symbol, look for its corresponding pops
+                    for pop_start_state, pop_input_transitions in pda_json["transitions"].items():
+                        for pop_input_symbol, pop_stack_operations in pop_input_transitions.items():
+                            for pop_check_symbol, (pop_end_state, pop_action_symbol) in pop_stack_operations.items():
+                                # Match pop if it is a pop of the same symbol with epsilon as the action
+                                if pop_check_symbol == push_symbol and pop_action_symbol == "epsilon":
+                                    # For each valid pop, create a new pair for the push and pop
+                                    push_pop_pair = {
+                                        "stack_symbol": push_symbol,
+                                        "start_push_state": start_state,
+                                        "end_push_state": end_state,
+                                        "start_pop_state": pop_start_state,
+                                        "end_pop_state": pop_end_state
+                                    }
+                                    pushed_popped_pairs.append(push_pop_pair)
+
+    # Print the found pairs for verification
+    for pair in pushed_popped_pairs:
+        print(f"Symbol: {pair['stack_symbol']}")
+        print(f"Push: {pair['start_push_state']} -> {pair['end_push_state']}")
+        print(f"Pop: {pair['start_pop_state']} -> {pair['end_pop_state']}")
+        print()
+
+    return pushed_popped_pairs
+
+def convert_pda_to_cfg(pda_json):
+    variables = []
+    alphabet = []
+    rules = []
+    start_variable = None
+
+    
+    
+    return create_cfg_json(variables, alphabet, rules, start_variable)
+
+def is_pop_to_push_needed(pda_json):
+    pass
+
+def create_rules():
+    pass
 
 def write_cfg_to_csv(cfg, filename='output.csv'):
     with open(filename, mode='w') as file:
@@ -177,120 +273,32 @@ def write_cfg_to_csv(cfg, filename='output.csv'):
         
         # Start Variable
         file.write(f"Start Variable: {cfg['start_variable']}\n")
-        
-def update_pda(pda_json):
-    # Step 1: Check if there is only one final state
-    if len(pda_json["final_states"]) == 1:
-        print("Only one final state, proceeding with updates.")
-    else:
-        print("There are multiple final states. Updates will be made later.")
-
-        # Step 1.1: Choose the last final state as the main accept state
-        main_accept_state = pda_json["final_states"][-1]
-        print(f"Main accept state is set to '{main_accept_state}'.")
-
-        # Step 1.2: Create transitions from each other accept state to the main accept state
-        for accept_state in pda_json["final_states"][:-1]:  # Exclude the last state
-            # Create the transition
-            if accept_state not in pda_json["transitions"]:
-                pda_json["transitions"][accept_state] = {}
-            if "epsilon" not in pda_json["transitions"][accept_state]:
-                pda_json["transitions"][accept_state]["epsilon"] = {}
-            pda_json["transitions"][accept_state]["epsilon"]["epsilon"] = (main_accept_state, "epsilon")
-
-
-    # Step 2: Check if the final transition empties the stack
-    stack_operations = {}
-    
-    # Track all stack operations (pushes and pops)
-    for current_state, input_symbol_dict in pda_json["transitions"].items():
-        for input_symbol, popped_symbol_dict in input_symbol_dict.items():
-            for popped_symbol, (next_state, pushed_symbol) in popped_symbol_dict.items():
-                # Track push operations
-                if pushed_symbol != 'ϵ':  # If it's not epsilon, it's a push
-                    if pushed_symbol not in stack_operations:
-                        stack_operations[pushed_symbol] = {'pushed': 0, 'popped': 0}
-                    stack_operations[pushed_symbol]['pushed'] += 1
-                
-                # Track pop operations
-                if popped_symbol != 'ϵ':  # If it's not epsilon, it's a pop
-                    if popped_symbol not in stack_operations:
-                        stack_operations[popped_symbol] = {'pushed': 0, 'popped': 0}
-                    stack_operations[popped_symbol]['popped'] += 1
-
-    # Check if any pushed symbol was not popped
-    for stack_symbol, operations in stack_operations.items():
-        if operations['pushed'] > operations['popped']:
-            error_message = f"Stack symbol '{stack_symbol}' was pushed but never fully popped. The stack needs to be emptied."
-            print(error_message)
-            raise ValueError(f"Stack not emptied: {error_message}. Please update the PDA input.")
-
-        
-   # Step 3: Check for transitions where the stack stays the same
-    fix_counter = 1  # Initialize fix counter
-    transitions_to_delete = []  # List to store transitions to delete
-
-    # Append new input alphabet character '@' to input_symbols if not already present
-    new_input_alpha = '@'
-    pda_json["input_symbols"].append(new_input_alpha)
-    
-    # Create a list of current transitions to iterate over
-    current_transitions = list(pda_json["transitions"].items())
-
-    for current_state, input_symbol_dict in current_transitions:
-        for input_symbol, popped_symbol_dict in list(input_symbol_dict.items()):
-            for popped_symbol, (next_state, pushed_symbol) in list(popped_symbol_dict.items()):
-                # Check if both the push and pop operations are the same
-                if popped_symbol == pushed_symbol:
-                    # Create a new fix state name
-                    fix_state_name = f"qfix{fix_counter}"
-                    fix_counter += 1
-
-                    # Create the new transition from the original start state to the fix state
-                    original_alphabet = input_symbol  # Store the original input symbol
-                    
-                    # Add new transitions to the PDA
-                    if fix_state_name not in pda_json["transitions"]:
-                        pda_json["transitions"][fix_state_name] = {}
-                    
-                    if original_alphabet not in pda_json["transitions"][current_state]:
-                        pda_json["transitions"][current_state][original_alphabet] = {}
-                    pda_json["transitions"][current_state][original_alphabet]["ϵ"] = (fix_state_name, new_input_alpha)
-                    
-                    if "ϵ" not in pda_json["transitions"][fix_state_name]:
-                        pda_json["transitions"][fix_state_name]["ϵ"] = {}
-                    pda_json["transitions"][fix_state_name]["ϵ"][new_input_alpha] = (next_state, "ϵ")
-
-                    # Mark the original transition for deletion
-                    transitions_to_delete.append((current_state, input_symbol))
-
-    # Delete the original transitions that caused issues
-    for current_state, input_symbol in transitions_to_delete:
-        del pda_json["transitions"][current_state][input_symbol]
-
-
-    # Print the updated PDA JSON for verification
-    print("Updated PDA JSON:")
-    print(json.dumps(pda_json, indent=4))  # Pretty-print the JSON with indentation
-
-    return pda_json
-
-def convert_pda_to_cfg(pda_json):
-    variables = []
-    alphabet = []
-    rules = []
-    start_variable = None
-
-    pda_json = update_pda(pda_json)
-    
-    return create_cfg_json(variables, alphabet, rules, start_variable)
 
 # Convert CSV to JSON and print the result
 pda_json = read_pda_from_csv('input.csv')
 pda_json = check_pda(pda_json)
-print(pda_json)
-pda_json = update_pda(pda_json)
-#cfg_json = convert_pda_to_cfg(pda_json)
+pda_json = check_pda_conversion(pda_json)
+print("Here is the PDA:")
+print(json.dumps(pda_json, indent=4))  # Pretty-print the JSON with indentation
+
+push_pop = find_push_to_pop(pda_json)
+
+
+
+
+# Define the components of the CFG
+variables = ["S"]
+alphabet = ["a", "b"]
+rules = {
+    "S": [
+        ["a", "S", "b"],  # Rule for S -> a S b
+        ["epsilon"]  # Rule for S -> ε (empty production)
+    ]
+}
+start_variable = "S"
+
+# Create CFG JSON
+cfg_json = create_cfg_json(variables, alphabet, rules, start_variable)
 
 # Write CFG JSON to CSV
-#write_cfg_to_csv(cfg_json)
+write_cfg_to_csv(cfg_json)

@@ -1,3 +1,6 @@
 Component, Values
-Variables: {}
-Alphabet: {}
+Variables: {S}
+Alphabet: {a b}
+Rule: S -> a S b
+Rule: S -> epsilon
+Start Variable: S
