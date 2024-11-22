@@ -1,3 +1,22 @@
+Sample 1:
+
+Component,Value
+states,q1,q2,q3,q4,q5
+input_alphabet,0,1
+stack_alphabet,$,0
+transitions,q1,epsilon,epsilon,q2,$
+transitions,q1,epsilon,epsilon,q5,$
+transitions,q2,0,epsilon,q2,0
+transitions,q2,1,0,q3,epsilon
+transitions,q3,1,0,q3,epsilon
+transitions,q3,epsilon,$,q4,epsilon
+transitions,q5,epsilon,$,q4,epsilon
+initial_state,q1
+final_states,q4
+
+
+Sample 2:
+
 Component,Value
 states,q1,q2,q3,q4,q5,q6,q7,q8,q9
 input_alphabet,a,b
