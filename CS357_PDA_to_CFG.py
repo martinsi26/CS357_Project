@@ -435,14 +435,14 @@ def find_largest_transition_number(pda_json):
 
 def add_epsilon_rules(rules, largest_transition_number):
     # Add A_ii -> epsilon rule for each i
-    epsilon_rule = f"A_ii"
+    epsilon_rule = "A_ii"
     # Add the comment line for A_ii -> epsilon for 1 <= i <= max_number
     rules[epsilon_rule] = f"epsilon\n\tfor 1 <= i <= {largest_transition_number}"
 
 
 def add_final_transition_rule(rules, largest_transition_number):
     # Add A_ik -> A_ij A_jk rule in general form
-    final_rule = f"A_ik"
+    final_rule = "A_ik"
     rules[final_rule] = f"A_ij A_jk\n\tfor 1 <= i <= {largest_transition_number}, 1 <= j <= {largest_transition_number}, 1 <= k <= {largest_transition_number}"
 
 
@@ -497,7 +497,7 @@ def process_grammar_and_create_cfg(rules, pda_json):
 def write_cfg_to_csv(cfg, filename='output.csv'):
     with open(filename, mode='w', newline='') as file:
         # Write the header
-        file.write(f"Component, Values\n")
+        file.write("Component, Values\n")
 
         # Format and write variables
         variables = "{" + ", ".join(cfg["variables"]) + "}"
@@ -508,7 +508,7 @@ def write_cfg_to_csv(cfg, filename='output.csv'):
         file.write(f"Alphabet: {alphabet}\n")
 
         # Write rules
-        file.write(f"Rules:\n")
+        file.write("Rules:\n")
         for lhs, rhs in cfg["rules"].items():
             file.write("\t")
             file.write(f"{lhs} -> ")
